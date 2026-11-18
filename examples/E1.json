@@ -1,0 +1,8 @@
+{
+  "scenarioId": "E1",
+  "commitSha": "PROTOTIPO_SIN_COMMIT_REAL",
+  "ruleVersion": "v1",
+  "linesCovered": 90,
+  "linesTotal": 100,
+  "eslintErrors": 0
+}
