@@ -1,0 +1,7 @@
+node_modules/
+prototype-data/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
