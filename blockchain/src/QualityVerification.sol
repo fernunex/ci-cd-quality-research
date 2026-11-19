@@ -23,6 +23,9 @@ contract QualityVerification {
 
     mapping(bytes32 => Evaluation) private evaluations;
 
+    // Permite localizar la última evaluación de cada versión.
+    mapping(bytes32 => bytes32) private latestEvaluationIdByVersion;
+
     event EvaluationRecorded(
         bytes32 indexed evaluationId,
         bytes32 indexed versionId,
@@ -85,6 +88,8 @@ contract QualityVerification {
             exists: true
         });
 
+        latestEvaluationIdByVersion[versionId] = evaluationId;
+
         emit EvaluationRecorded(evaluationId, versionId, approved, linesCovered, linesTotal, eslintErrors);
     }
 
@@ -97,5 +102,22 @@ contract QualityVerification {
 
         return result;
     }
-}
 
+    function hasVersion(bytes32 versionId) external view returns (bool) {
+        return latestEvaluationIdByVersion[versionId] != bytes32(0);
+    }
+
+    function getLatestEvaluationByVersion(bytes32 versionId)
+        external
+        view
+        returns (bytes32 evaluationId, Evaluation memory evaluation)
+    {
+        evaluationId = latestEvaluationIdByVersion[versionId];
+
+        if (evaluationId == bytes32(0)) {
+            revert EvaluationNotFound();
+        }
+
+        evaluation = evaluations[evaluationId];
+    }
+}
