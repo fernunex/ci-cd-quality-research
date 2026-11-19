@@ -6,7 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "verify:conventional": "tsx src/conventional.ts"
+    "verify:conventional": "tsx src/conventional.ts",
+    "query:conventional": "tsx src/query-conventional.ts"
   },
   "engines": {
     "node": ">=22.13.0"
