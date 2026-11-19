@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "verify:conventional": "tsx src/conventional.ts",
     "query:conventional": "tsx src/query-conventional.ts",
-    "query:blockchain": "tsx src/query-blockchain.ts"
+    "query:blockchain": "tsx src/query-blockchain.ts",
+    "verify:blockchain": "tsx src/verify-blockchain.ts"
   },
   "engines": {
     "node": ">=22.13.0"
