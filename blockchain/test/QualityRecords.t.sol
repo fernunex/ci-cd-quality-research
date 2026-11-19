@@ -77,5 +77,47 @@ contract QualityRecordsTest is Test {
 
         verifier.getEvaluation(EVALUATION_ID);
     }
+
+    function test_QueryByVersion() public {
+        verifier.recordEvaluation(EVALUATION_ID, VERSION_ID, 90, 100, 0);
+
+        assertTrue(verifier.hasVersion(VERSION_ID));
+
+        (bytes32 evaluationId, QualityVerification.Evaluation memory record) =
+            verifier.getLatestEvaluationByVersion(VERSION_ID);
+
+        assertEq(evaluationId, EVALUATION_ID);
+        assertEq(record.versionId, VERSION_ID);
+        assertTrue(record.approved);
+    }
+
+    function test_MultipleEvaluationsSameVersion() public {
+        bytes32 secondId = keccak256("E1-run2");
+
+        verifier.recordEvaluation(EVALUATION_ID, VERSION_ID, 90, 100, 0);
+
+        verifier.recordEvaluation(secondId, VERSION_ID, 70, 100, 0);
+
+        (bytes32 latestId, QualityVerification.Evaluation memory latest) =
+            verifier.getLatestEvaluationByVersion(VERSION_ID);
+
+        assertEq(latestId, secondId);
+        assertFalse(latest.approved);
+
+        // El registro anterior permanece disponible.
+        QualityVerification.Evaluation memory previous = verifier.getEvaluation(EVALUATION_ID);
+
+        assertTrue(previous.approved);
+    }
+
+    function test_UnregisteredVersion() public {
+        bytes32 unknownVersion = keccak256("unknown");
+
+        assertFalse(verifier.hasVersion(unknownVersion));
+
+        vm.expectRevert(QualityVerification.EvaluationNotFound.selector);
+
+        verifier.getLatestEvaluationByVersion(unknownVersion);
+    }
 }
 
