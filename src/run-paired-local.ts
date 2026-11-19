@@ -60,6 +60,7 @@ function findRecord(
   return matches[0];
 }
 
+
 function main(): void {
   const tempDir = mkdtempSync(
     join(tmpdir(), "quality-paired-")
@@ -116,6 +117,26 @@ function main(): void {
         evaluationId
       );
 
+      const conventionalTiming = findRecord(
+  resolve("prototype-data/conventional-timings.jsonl"),
+  evaluationId
+);
+
+const conventionalVerificationMs =
+  Number(conventionalTiming.verificationMs);
+
+const blockchainVerificationMs =
+  Number(blockchain.verificationMs);
+
+if (
+  !Number.isFinite(conventionalVerificationMs) ||
+  !Number.isFinite(blockchainVerificationMs) ||
+  conventionalVerificationMs < 0 ||
+  blockchainVerificationMs < 0
+) {
+  throw new Error("Duración de verificación inválida.");
+}
+
       const fields = [
         "scenarioId",
         "commitSha",
@@ -140,16 +161,22 @@ function main(): void {
       }
 
       const summary = {
-        scenarioId: scenario,
-        evaluationId,
-        decision: blockchain.decision,
-        concordant: true,
-        gasUsed: blockchain.gasUsed,
-        blockchainVerificationMs:
-          blockchain.verificationMs,
-        transactionHash: blockchain.transactionHash,
-        chainId: blockchain.chainId,
-      };
+  scenarioId: scenario,
+  evaluationId,
+  decision: blockchain.decision,
+  concordant: true,
+  conventionalVerificationMs,
+  blockchainVerificationMs,
+  differenceMs: Number(
+    (
+      blockchainVerificationMs -
+      conventionalVerificationMs
+    ).toFixed(3)
+  ),
+  gasUsed: blockchain.gasUsed,
+  transactionHash: blockchain.transactionHash,
+  chainId: blockchain.chainId,
+};
 
       appendFileSync(
         resolve("prototype-data/paired-local.jsonl"),
