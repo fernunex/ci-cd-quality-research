@@ -102,26 +102,66 @@ jobs:
           echo "Authorized evaluator: $AUTHORIZED"
           echo "Contract validation successful."
 
-      - name: Run paired evaluations
-        run: npm run test:paired-local
-
-      - name: Validate paired evidence
+      - name: Validate experimental subject tags
+        shell: bash
         run: |
+          set -euo pipefail
+
+          for tag in \
+            subject-e1-v1 \
+            subject-e2-v1 \
+            subject-e3-v1 \
+            subject-e4-v1; do
+
+            echo "Checking $tag"
+            git rev-parse --verify "$tag^{commit}"
+          done
+
+      - name: Run paired evaluations with real metrics
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          for scenario in E1 E2 E3 E4; do
+            echo "=== Evaluating $scenario ==="
+
+            node scripts/run-subject-pair.mjs \
+              "$scenario" \
+              --repeat 1 \
+              --send
+          done
+
+      - name: Validate real-metric paired evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+
           jq -s -e '
             (length == 4) and
-            ((map(.scenarioId) | sort) == ["E1", "E2", "E3", "E4"]) and
+            (([.[].scenarioId] | sort) == ["E1", "E2", "E3", "E4"]) and
+            (([.[].evaluationId] | unique | length) == 4) and
+            (([.[].commitSha] | unique | length) == 4) and
             (all(.[];
               .concordant == true and
               .chainId == 11155111 and
               (.gasUsed | type) == "number" and
-              (.differenceMs | type) == "number"
+              .gasUsed > 0 and
+              (.conventionalVerificationMs | type) == "number" and
+              (.blockchainVerificationMs | type) == "number" and
+              (.transactionHash | test("^0x[0-9a-fA-F]{64}$")) and
+              .conventional == .blockchain and
+              (if .scenarioId == "E1" then
+                .conventional == "APROBADO"
+              else
+                .conventional == "RECHAZADO"
+              end)
             ))
-          ' prototype-data/paired-sepolia-dev.jsonl
+          ' prototype-data/paired-subject-sepolia-dev.jsonl
 
-      - name: Upload verification evidence
+      - name: Upload experimental evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: paired-quality-sepolia
-          path: prototype-data/*.jsonl
+          name: paired-quality-real-metrics-sepolia
+          path: prototype-data/
           if-no-files-found: warn
