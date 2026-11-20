@@ -17,7 +17,7 @@ jobs:
 
     env:
       TARGET_NETWORK: sepolia
-      CONTRACT: "0xeb67416522bbf4A8d1F205a94129Fbf38E03bF48"
+      CONTRACT: ${{ vars.CONTRACT_ADDRESS }}
       SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
       SEPOLIA_KEYSTORE_JSON: ${{ secrets.SEPOLIA_KEYSTORE_JSON }}
       SEPOLIA_KEYSTORE_PASSWORD: ${{ secrets.SEPOLIA_KEYSTORE_PASSWORD }}
@@ -68,6 +68,38 @@ jobs:
           test "$CODE" != "0x"
 
           echo "Sepolia connection OK"
+
+      - name: Validate deployed contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$CONTRACT" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+            echo "ERROR: Configure CONTRACT_ADDRESS in GitHub Actions Variables."
+            exit 1
+          fi
+
+          CHAIN_ID=$(cast chain-id --rpc-url "$SEPOLIA_RPC_URL")
+
+          if [ "$CHAIN_ID" != "11155111" ]; then
+            echo "ERROR: RPC is not connected to Sepolia."
+            exit 1
+          fi
+
+          CODE=$(cast code "$CONTRACT" --rpc-url "$SEPOLIA_RPC_URL")
+
+          if [ "$CODE" = "0x" ]; then
+            echo "ERROR: No contract found at CONTRACT_ADDRESS."
+            exit 1
+          fi
+
+          AUTHORIZED=$(cast call "$CONTRACT" \
+            "authorizedEvaluator()(address)" \
+            --rpc-url "$SEPOLIA_RPC_URL")
+
+          echo "Contract address: $CONTRACT"
+          echo "Authorized evaluator: $AUTHORIZED"
+          echo "Contract validation successful."
 
       - name: Run paired evaluations
         run: npm run test:paired-local
