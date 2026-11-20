@@ -1,5 +1,5 @@
 {
-  "scenarioId": "E2",
-  "testProfile": "low",
-  "lintVariant": "clean"
+  "scenarioId": "E3",
+  "testProfile": "high",
+  "lintVariant": "lint-error"
 }
