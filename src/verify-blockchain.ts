@@ -74,7 +74,8 @@ async function main() {
       "sepoliaDev",
     );
 
-    const encryptedJson = readFileSync(keystorePath, "utf8");
+    const encryptedJson =
+      process.env.SEPOLIA_KEYSTORE_JSON ?? readFileSync(keystorePath, "utf8");
 
     const wallet = await Wallet.fromEncryptedJson(
       encryptedJson,
