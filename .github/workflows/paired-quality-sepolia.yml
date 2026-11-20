@@ -1,0 +1,94 @@
+name: Paired Quality Verification - Sepolia
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-sepolia-verification
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      TARGET_NETWORK: sepolia
+      CONTRACT: "0xeb67416522bbf4A8d1F205a94129Fbf38E03bF48"
+      SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+      SEPOLIA_KEYSTORE_JSON: ${{ secrets.SEPOLIA_KEYSTORE_JSON }}
+      SEPOLIA_KEYSTORE_PASSWORD: ${{ secrets.SEPOLIA_KEYSTORE_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Set up Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate TypeScript
+        run: |
+          npm test
+          npm run typecheck
+
+      - name: Validate Solidity
+        working-directory: blockchain
+        run: |
+          forge test
+          forge build
+
+      - name: Check Sepolia connection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -n "$SEPOLIA_RPC_URL"
+          test -n "$SEPOLIA_KEYSTORE_JSON"
+          test -n "$SEPOLIA_KEYSTORE_PASSWORD"
+
+          CHAIN_ID=$(cast chain-id --rpc-url "$SEPOLIA_RPC_URL")
+          test "$CHAIN_ID" = "11155111"
+
+          CODE=$(cast code "$CONTRACT" \
+            --rpc-url "$SEPOLIA_RPC_URL")
+          test "$CODE" != "0x"
+
+          echo "Sepolia connection OK"
+
+      - name: Run paired evaluations
+        run: npm run test:paired-local
+
+      - name: Validate paired evidence
+        run: |
+          jq -s -e '
+            (length == 4) and
+            ((map(.scenarioId) | sort) == ["E1", "E2", "E3", "E4"]) and
+            (all(.[];
+              .concordant == true and
+              .chainId == 11155111 and
+              (.gasUsed | type) == "number" and
+              (.differenceMs | type) == "number"
+            ))
+          ' prototype-data/paired-sepolia-dev.jsonl
+
+      - name: Upload verification evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paired-quality-sepolia
+          path: prototype-data/*.jsonl
+          if-no-files-found: warn

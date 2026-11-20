@@ -5,3 +5,10 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Foundry
+/blockchain/out/
+/blockchain/cache/
+/blockchain/broadcast/
+/blockchain/.env
+/blockchain/.env.*

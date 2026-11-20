@@ -1,51 +1,57 @@
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { evaluateQuality, validateMetrics } from "./quality-rules.js";
 
-function requiredText(value: unknown, name: string): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    throw new Error(`${name} debe ser un texto no vacío.`);
-  }
-  return value;
-}
+import { appendFileSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { performance } from "node:perf_hooks";
+
+import {
+  DEFAULT_RECORDS_PATH,
+  parseEvaluationInput,
+  saveEvaluation,
+} from "./conventional-records.js";
 
 try {
   const inputFile = process.argv[2];
+
   if (!inputFile) {
-    throw new Error("Uso: npm run verify:conventional -- examples/E1.json");
+    throw new Error(
+      "Uso: npm run verify:conventional -- examples/E1.json"
+    );
   }
 
-  const raw: unknown = JSON.parse(readFileSync(inputFile, "utf8"));
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    throw new Error("La entrada debe ser un objeto JSON.");
-  }
-  const input = raw as Record<string, unknown>;
-  const scenarioId = requiredText(input.scenarioId, "scenarioId");
-  const commitSha = requiredText(input.commitSha, "commitSha");
-  const ruleVersion = requiredText(input.ruleVersion, "ruleVersion");
-  if (ruleVersion !== "v1") {
-    throw new Error("Por ahora solo está soportada ruleVersion=v1.");
-  }
+  // Preparar las métricas antes de iniciar la medición.
+  const input = parseEvaluationInput(
+    JSON.parse(readFileSync(inputFile, "utf8"))
+  );
 
-  const metrics = validateMetrics(input);
-  const decision = evaluateQuality(metrics);
-  const record = {
-    scenarioId,
-    commitSha,
-    ruleVersion,
-    ...metrics,
-    decision,
-    evaluatedAt: new Date().toISOString(),
-  };
+  // Intervalo: decisión convencional y persistencia en JSONL.
+  const start = performance.now();
 
-  const outputDir = join(process.cwd(), "prototype-data");
-  mkdirSync(outputDir, { recursive: true });
-  const outputFile = join(outputDir, "conventional.jsonl");
-  appendFileSync(outputFile, JSON.stringify(record) + "\n", "utf8");
+  const record = saveEvaluation(input);
 
-  console.log(`Decisión: ${decision}`);
-  console.log(`Registro guardado en: ${outputFile}`);
+  const verificationMs = Number(
+    (performance.now() - start).toFixed(3)
+  );
+
+  // Guardamos la duración después de finalizar el intervalo medido.
+  appendFileSync(
+    resolve("prototype-data/conventional-timings.jsonl"),
+    JSON.stringify({
+      scenarioId: record.scenarioId,
+      evaluationId: record.evaluationId,
+      verificationMs,
+    }) + "\n",
+    "utf8"
+  );
+
+  console.log(`Evaluación: ${record.evaluationId}`);
+  console.log(`Decisión: ${record.decision}`);
+  console.log(`Tiempo convencional: ${verificationMs} ms`);
+  console.log(`Registro guardado en: ${DEFAULT_RECORDS_PATH}`);
 } catch (error) {
-  console.error("Error de evaluación:", error instanceof Error ? error.message : error);
+  console.error(
+    "Error de evaluación:",
+    error instanceof Error ? error.message : error
+  );
   process.exitCode = 1;
 }
+
