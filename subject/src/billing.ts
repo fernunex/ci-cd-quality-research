@@ -3,7 +3,7 @@ import { cartSubtotal } from "./cart.js";
 import { couponDiscount } from "./discounts.js";
 import { shippingFee } from "./shipping.js";
 
-export function calculateTax(taxableCents: number, rate: any): number {
+export function calculateTax(taxableCents: number, rate: number): number {
   if (!Number.isSafeInteger(taxableCents) || taxableCents < 0) {
     throw new Error("Invalid taxable amount");
   }
