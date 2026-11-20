@@ -1,36 +1,43 @@
-
 import { readFileSync, appendFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { performance } from "node:perf_hooks";
-import { Contract, JsonRpcProvider, isAddress } from "ethers";
+import { Contract, JsonRpcProvider, Wallet, isAddress } from "ethers";
+import { homedir } from "node:os";
 
-import {
-  parseEvaluationInput,
-  toBytes32Id,
-} from "./conventional-records.js";
+import { parseEvaluationInput, toBytes32Id } from "./conventional-records.js";
 import { evaluateQuality } from "./quality-rules.js";
 
 async function main() {
   const inputPath = process.argv[2];
 
   if (!inputPath) {
-    throw new Error(
-      "Uso: npm run verify:blockchain -- examples/E1.json"
-    );
+    throw new Error("Uso: npm run verify:blockchain -- examples/E1.json");
   }
 
   // 1. Leer y validar las métricas.
   const input = parseEvaluationInput(
-    JSON.parse(readFileSync(inputPath, "utf8"))
+    JSON.parse(readFileSync(inputPath, "utf8")),
   );
 
   const expectedDecision = evaluateQuality(input);
   const evaluationId = toBytes32Id(input.evaluationId);
   const versionId = toBytes32Id(input.commitSha);
 
-  // 2. Conectar exclusivamente a Anvil.
+  const targetNetwork = process.env.TARGET_NETWORK ?? "anvil";
+
+  if (!["anvil", "sepolia"].includes(targetNetwork)) {
+    throw new Error("TARGET_NETWORK debe ser anvil o sepolia.");
+  }
+
   const rpcUrl =
-    process.env.RPC_URL ?? "http://127.0.0.1:8545";
+    targetNetwork === "sepolia"
+      ? process.env.SEPOLIA_RPC_URL
+      : (process.env.RPC_URL ?? "http://127.0.0.1:8545");
+
+  if (!rpcUrl) {
+    throw new Error("No se configuró la URL del RPC.");
+  }
+
   const address = process.env.CONTRACT;
 
   if (!address || !isAddress(address)) {
@@ -40,19 +47,50 @@ async function main() {
   const provider = new JsonRpcProvider(rpcUrl);
   const network = await provider.getNetwork();
 
-  if (network.chainId !== 31337n) {
-    throw new Error("Este prototipo solo permite Anvil (31337).");
+  const expectedChainId = targetNetwork === "sepolia" ? 11155111n : 31337n;
+
+  if (network.chainId !== expectedChainId) {
+    throw new Error(
+      `Red incorrecta. Esperada: ${expectedChainId}, ` +
+        `obtenida: ${network.chainId}`,
+    );
   }
 
-  const signer = await provider.getSigner(0);
+  let signer;
+
+  if (targetNetwork === "anvil") {
+    signer = await provider.getSigner(0);
+  } else {
+    const keystorePassword = process.env.SEPOLIA_KEYSTORE_PASSWORD;
+
+    if (!keystorePassword) {
+      throw new Error("Falta SEPOLIA_KEYSTORE_PASSWORD.");
+    }
+
+    const keystorePath = resolve(
+      homedir(),
+      ".foundry",
+      "keystores",
+      "sepoliaDev",
+    );
+
+    const encryptedJson = readFileSync(keystorePath, "utf8");
+
+    const wallet = await Wallet.fromEncryptedJson(
+      encryptedJson,
+      keystorePassword,
+    );
+
+    signer = wallet.connect(provider);
+  }
 
   const artifact = JSON.parse(
     readFileSync(
       resolve(
-        "blockchain/out/QualityVerification.sol/QualityVerification.json"
+        "blockchain/out/QualityVerification.sol/QualityVerification.json",
       ),
-      "utf8"
-    )
+      "utf8",
+    ),
   );
 
   const contract = new Contract(address, artifact.abi, signer);
@@ -63,10 +101,7 @@ async function main() {
 
   const authorized = await contract.authorizedEvaluator();
 
-  if (
-    authorized.toLowerCase() !==
-    (await signer.getAddress()).toLowerCase()
-  ) {
+  if (authorized.toLowerCase() !== (await signer.getAddress()).toLowerCase()) {
     throw new Error("La cuenta no está autorizada para registrar.");
   }
 
@@ -78,7 +113,7 @@ async function main() {
     versionId,
     input.linesCovered,
     input.linesTotal,
-    input.eslintErrors
+    input.eslintErrors,
   );
 
   console.log("Transacción enviada:", tx.hash);
@@ -95,9 +130,7 @@ async function main() {
   // 4. Recuperar y comprobar la decisión registrada.
   const stored = await contract.getEvaluation(evaluationId);
 
-  const decision = stored.approved
-    ? "APROBADO"
-    : "RECHAZADO";
+  const decision = stored.approved ? "APROBADO" : "RECHAZADO";
 
   if (
     !stored.exists ||
@@ -132,15 +165,13 @@ async function main() {
   };
 
   const outputPath = resolve(
-    "prototype-data/blockchain.jsonl"
+    targetNetwork === "sepolia"
+      ? "prototype-data/blockchain-sepolia-dev.jsonl"
+      : "prototype-data/blockchain.jsonl",
   );
 
   mkdirSync(dirname(outputPath), { recursive: true });
-  appendFileSync(
-    outputPath,
-    JSON.stringify(result) + "\n",
-    "utf8"
-  );
+  appendFileSync(outputPath, JSON.stringify(result) + "\n", "utf8");
 
   console.log(JSON.stringify(result, null, 2));
   console.log("Evidencia guardada en:", outputPath);
@@ -149,7 +180,7 @@ async function main() {
 main().catch((error: unknown) => {
   console.error(
     "Error blockchain:",
-    error instanceof Error ? error.message : error
+    error instanceof Error ? error.message : error,
   );
   process.exitCode = 1;
 });
