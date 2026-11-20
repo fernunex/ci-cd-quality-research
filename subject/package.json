@@ -1,0 +1,7 @@
+{
+  "name": "quality-experimental-subject",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sistema experimental de gestión de pedidos e inventario. No es un servicio productivo."
+}

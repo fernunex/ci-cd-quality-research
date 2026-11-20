@@ -12,3 +12,8 @@ coverage/
 /blockchain/broadcast/
 /blockchain/.env
 /blockchain/.env.*
+# Workspaces and measurements generated from experimental subject
+experimental-workspaces/
+subject/dist/
+coverage/
+prototype-data/

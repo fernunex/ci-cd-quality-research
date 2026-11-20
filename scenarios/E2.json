@@ -1,0 +1,8 @@
+{
+  "scenarioId": "E2",
+  "description": "Cobertura baja, ESLint sin errores",
+  "testProfile": "low",
+  "lintVariant": "clean",
+  "expectedDecision": "RECHAZADO",
+  "gitTag": "subject-e2-v1"
+}

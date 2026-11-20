@@ -1,0 +1,8 @@
+{
+  "scenarioId": "E4",
+  "description": "Cobertura baja, ESLint con una infracción controlada",
+  "testProfile": "low",
+  "lintVariant": "lint-error",
+  "expectedDecision": "RECHAZADO",
+  "gitTag": "subject-e4-v1"
+}

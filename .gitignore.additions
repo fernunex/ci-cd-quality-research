@@ -1,0 +1,5 @@
+# Workspaces and measurements generated from experimental subject
+experimental-workspaces/
+subject/dist/
+coverage/
+prototype-data/
