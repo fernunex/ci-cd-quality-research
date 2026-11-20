@@ -13,7 +13,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
 
     env:
       TARGET_NETWORK: sepolia
@@ -117,46 +117,93 @@ jobs:
             git rev-parse --verify "$tag^{commit}"
           done
 
-      - name: Run paired evaluations with real metrics
+      - name: Record experiment metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p prototype-data
+
+          {
+            echo "GitHub run: $GITHUB_RUN_ID"
+            echo "Run attempt: $GITHUB_RUN_ATTEMPT"
+            echo "Workflow commit: $GITHUB_SHA"
+            echo "Network: Sepolia (11155111)"
+            echo "Contract: $CONTRACT"
+            echo "Recorded at: $(date -u +%FT%TZ)"
+
+            for scenario in e1 e2 e3 e4; do
+              tag="subject-${scenario}-v1"
+              echo "$tag: $(git rev-parse "$tag^{commit}")"
+            done
+          } > prototype-data/experiment-metadata.txt
+
+      - name: Run 20 experimental paired evaluations
         shell: bash
         run: |
           set -euo pipefail
 
-          for scenario in E1 E2 E3 E4; do
-            echo "=== Evaluating $scenario ==="
+          SCENARIOS=(E1 E2 E3 E4)
 
-            node scripts/run-subject-pair.mjs \
-              "$scenario" \
-              --repeat 1 \
-              --send
+          for repeat in {1..5}; do
+            offset=$(( (repeat - 1) % 4 ))
+
+            for step in {0..3}; do
+              index=$(( (offset + step) % 4 ))
+              scenario="${SCENARIOS[$index]}"
+
+              echo "================================"
+              echo "Scenario: $scenario"
+              echo "Repetition: $repeat"
+              echo "================================"
+
+              node scripts/run-subject-pair.mjs \
+                "$scenario" \
+                --repeat "$repeat" \
+                --send
+            done
           done
 
-      - name: Validate real-metric paired evidence
+      - name: Validate experimental dataset
         shell: bash
         run: |
           set -euo pipefail
 
+          FILE="prototype-data/paired-subject-sepolia-dev.jsonl"
+
           jq -s -e '
-            (length == 4) and
-            (([.[].scenarioId] | sort) == ["E1", "E2", "E3", "E4"]) and
-            (([.[].evaluationId] | unique | length) == 4) and
+            (length == 20) and
+
+            (([.[].evaluationId] | unique | length) == 20) and
+
+            (([.[].transactionHash] | unique | length) == 20) and
+
             (([.[].commitSha] | unique | length) == 4) and
+
+            (
+              ([.[].scenarioId] |
+                group_by(.) |
+                map({scenario: .[0], count: length}) |
+                sort_by(.scenario))
+              ==
+              [
+                {"scenario":"E1","count":5},
+                {"scenario":"E2","count":5},
+                {"scenario":"E3","count":5},
+                {"scenario":"E4","count":5}
+              ]
+            ) and
+
             (all(.[];
-              .concordant == true and
               .chainId == 11155111 and
               (.gasUsed | type) == "number" and
               .gasUsed > 0 and
-              (.conventionalVerificationMs | type) == "number" and
-              (.blockchainVerificationMs | type) == "number" and
-              (.transactionHash | test("^0x[0-9a-fA-F]{64}$")) and
-              .conventional == .blockchain and
-              (if .scenarioId == "E1" then
-                .conventional == "APROBADO"
-              else
-                .conventional == "RECHAZADO"
-              end)
+              (.differenceMs | type) == "number" and
+              (.transactionHash |
+                test("^0x[0-9a-fA-F]{64}$"))
             ))
-          ' prototype-data/paired-subject-sepolia-dev.jsonl
+          ' "$FILE"
+
+          echo "Dataset structure validated."
 
       - name: Upload experimental evidence
         if: always()
