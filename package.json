@@ -10,15 +10,23 @@
     "query:conventional": "tsx src/query-conventional.ts",
     "query:blockchain": "tsx src/query-blockchain.ts",
     "verify:blockchain": "tsx src/verify-blockchain.ts",
-    "test:paired-local": "tsx src/run-paired-local.ts"
+    "test:paired-local": "tsx src/run-paired-local.ts",
+    "subject:build": "tsc -p subject/tsconfig.json",
+    "subject:typecheck": "tsc -p subject/tsconfig.json --noEmit",
+    "subject:demo": "node subject/examples/demo.mjs",
+    "subject:metrics": "node scripts/collect-subject-metrics.mjs",
+    "subject:pair": "node scripts/run-subject-pair.mjs"
   },
   "engines": {
     "node": ">=22.13.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.1.1",
+    "eslint": "^10.15.0",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.73.0",
     "vitest": "^5.1.1"
   },
   "dependencies": {

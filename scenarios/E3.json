@@ -1,0 +1,8 @@
+{
+  "scenarioId": "E3",
+  "description": "Cobertura alta, ESLint con una infracción controlada",
+  "testProfile": "high",
+  "lintVariant": "lint-error",
+  "expectedDecision": "RECHAZADO",
+  "gitTag": "subject-e3-v1"
+}
