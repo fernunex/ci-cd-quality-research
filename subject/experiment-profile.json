@@ -1,5 +1,5 @@
 {
-  "scenarioId": "E1",
-  "testProfile": "high",
+  "scenarioId": "E2",
+  "testProfile": "low",
   "lintVariant": "clean"
 }
